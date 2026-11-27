@@ -24,6 +24,9 @@
 #ifndef PACKED_STRUCT                                /* (wup-doom: Chocolate 3.1's, which doomgeneric's doomtype.h lacks) */
 #define PACKED_STRUCT(...) struct __VA_ARGS__ PACKEDATTR
 #endif
+#include <stdint.h>
+uint32_t SDL_SwapBE32(uint32_t v);                   /* (wup_compat.c: Chocolate 3.1 swaps with SDL's) */
+uint16_t SDL_SwapBE16(uint16_t v);
 
 typedef struct midi_file_s midi_file_t;
 typedef struct midi_track_iter_s midi_track_iter_t;

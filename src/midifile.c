@@ -26,6 +26,7 @@
 #include "i_system.h"
 #include "m_misc.h"
 #include "midifile.h"
+#include "z_zone.h"
 
 #define HEADER_CHUNK_ID "MThd"
 #define TRACK_CHUNK_ID  "MTrk"
@@ -452,41 +453,49 @@ static boolean ReadTrack(midi_track_t *track, FILE *stream)
         return false;
     }
 
-    // Then the events:
+    // Then the events (wup-doom: counted first, then read into one block of exactly that size in Doom's zone: the C
+    // library's heap is small on the pad, and growing the list there failed on long songs, E1M2's)
 
-    last_event_type = 0;
-
-    int capacity = 0;                    /* (wup-doom: grown in large steps; one event at a time fragmented the pad's
-                                            small heap until a long song's realloc failed) */
-    for (;;)
     {
-        if (track->num_events == capacity)
+        midi_event_t scratch;
+        long start = ftell(stream);
+        int count = 0;
+
+        last_event_type = 0;
+        for (;;)
         {
-            capacity = capacity ? capacity * 2 : 256;
-            new_events = I_Realloc(track->events, sizeof(midi_event_t) * capacity);
-            track->events = new_events;
+            if (!ReadEvent(&scratch, &last_event_type, stream))
+            {
+                return false;
+            }
+            ++count;
+            int end = scratch.event_type == MIDI_EVENT_META && scratch.data.meta.type == MIDI_META_END_OF_TRACK;
+            FreeEvent(&scratch);
+            if (end)
+            {
+                break;
+            }
         }
 
-        // Read the next event:
-
-        event = &track->events[track->num_events];
-        if (!ReadEvent(event, &last_event_type, stream))
+        if (fseek(stream, start, SEEK_SET) != 0)
         {
             return false;
         }
+        new_events = Z_Malloc(sizeof(midi_event_t) * count, PU_STATIC, NULL);
+        track->events = new_events;
 
-        ++track->num_events;
-
-        // End of track?
-
-        if (event->event_type == MIDI_EVENT_META
-         && event->data.meta.type == MIDI_META_END_OF_TRACK)
+        last_event_type = 0;
+        while (track->num_events < count)
         {
-            break;
+            event = &track->events[track->num_events];
+            if (!ReadEvent(event, &last_event_type, stream))
+            {
+                return false;
+            }
+            ++track->num_events;
         }
     }
 
-    track->events = I_Realloc(track->events, sizeof(midi_event_t) * track->num_events);   /* (the spare given back) */
     return true;
 }
 
@@ -501,7 +510,7 @@ static void FreeTrack(midi_track_t *track)
         FreeEvent(&track->events[i]);
     }
 
-    free(track->events);
+    if (track->events != NULL) Z_Free(track->events);   /* (wup-doom: the zone's) */
 }
 
 static boolean ReadAllTracks(midi_file_t *file, FILE *stream)

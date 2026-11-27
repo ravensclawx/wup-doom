@@ -46,10 +46,12 @@ static uint16_t row_of[480];                         /* the source row of each s
 
 void I_InitGraphics(void) {
     I_VideoBuffer = Z_Malloc(SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);
+    memset(I_VideoBuffer, 0, SCREENWIDTH * SCREENHEIGHT);   /* (the first screen wipe melts from it: left as it came,
+                                                              it showed a frame of garbage) */
     scr = wup_screen8(); stride = wup_stride8();
     memset(scr, 0, stride * 480);
     for (int y = 0; y < 480; y++) row_of[y] = (uint16_t)(y * SCREENHEIGHT / 480);
-    for (int i = 0; i < 256; i++) wup_palette(i, 0);
+    I_SetPalette(W_CacheLumpName("PLAYPAL", PU_CACHE));   /* (Doom's own, from the start) */
     wup_present8(0, 480);
 }
 void I_ShutdownGraphics(void) {}
