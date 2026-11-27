@@ -1,4 +1,4 @@
-// (wup-doom: Chocolate Doom 3.1.0's midifile.c, with MIDI_LoadMem; here so that its includes find doomgeneric's headers.)
+// (wup-doom: Chocolate Doom 3.1.0's midifile.c, with MIDI_LoadMem and tracks grown in large steps; here so that its includes find doomgeneric's headers.)
 //
 // Copyright(C) 2005-2014 Simon Howard
 //
@@ -456,13 +456,16 @@ static boolean ReadTrack(midi_track_t *track, FILE *stream)
 
     last_event_type = 0;
 
+    int capacity = 0;                    /* (wup-doom: grown in large steps; one event at a time fragmented the pad's
+                                            small heap until a long song's realloc failed) */
     for (;;)
     {
-        // Resize the track slightly larger to hold another event:
-
-        new_events = I_Realloc(track->events, 
-                             sizeof(midi_event_t) * (track->num_events + 1));
-        track->events = new_events;
+        if (track->num_events == capacity)
+        {
+            capacity = capacity ? capacity * 2 : 256;
+            new_events = I_Realloc(track->events, sizeof(midi_event_t) * capacity);
+            track->events = new_events;
+        }
 
         // Read the next event:
 
@@ -483,6 +486,7 @@ static boolean ReadTrack(midi_track_t *track, FILE *stream)
         }
     }
 
+    track->events = I_Realloc(track->events, sizeof(midi_event_t) * track->num_events);   /* (the spare given back) */
     return true;
 }
 

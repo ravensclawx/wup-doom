@@ -27,6 +27,8 @@
 #include "i_system.h"
 #include "d_main.h"
 #include "tables.h"
+#include "doomstat.h"
+#include "p_pspr.h"
 
 WUP_APP("wup-doom");
 
@@ -117,7 +119,35 @@ static int curve(int v, int full) {                  /* a stick: a dead zone, th
     long r = (long)a * a / 980 * full / 980;
     return v < 0 ? -(int)r : (int)r;
 }
+/* ---- rumble: the player's own shots (the weapon's muzzle flash appearing: every gun, not the monsters', which sound
+   the same) and the hits the player takes (the red flash, Doom's damagecount: longer for harder hits) */
+static uint32_t rumble_until;
+static int rumbling;
+static void rumble_for(int ms) {
+    uint32_t until = DG_GetTicksMs() + (uint32_t)ms;
+    if (!rumbling || (int)(until - rumble_until) > 0) rumble_until = until;
+    if (!rumbling) { wup_rumble(1); rumbling = 1; }
+}
+static void rumble_tic(void) {
+    static const void *flash_was;
+    static int damage_was;
+    if (gamestate == GS_LEVEL && !paused && !menuactive) {
+        player_t *p = &players[consoleplayer];
+        const void *flash = p->psprites[ps_flash].state;
+        if (flash && !flash_was) {
+            static const short ms[NUMWEAPONS] = { 0, 70, 130, 60, 140, 90, 260, 0, 130 };   /* fist .. super shotgun */
+            if ((unsigned)p->readyweapon < NUMWEAPONS && ms[p->readyweapon]) rumble_for(ms[p->readyweapon]);
+        }
+        flash_was = flash;
+        if (p->readyweapon == wp_chainsaw && p->attackdown) rumble_for(40);   /* (the chainsaw: while it saws) */
+        if (p->damagecount > damage_was) rumble_for(60 + 8 * (p->damagecount - damage_was));
+        damage_was = p->damagecount;
+    } else flash_was = NULL;
+    if (rumbling && (int)(DG_GetTicksMs() - rumble_until) >= 0) { wup_rumble(0); rumbling = 0; }
+}
+
 void I_StartTic(void) {
+    rumble_tic();
     unsigned b = wup_buttons();
     if (b & WUP_HOME) I_Quit();                      /* (back to the Homebrew Menu) */
     for (unsigned i = 0; i < sizeof map / sizeof *map; i++) {

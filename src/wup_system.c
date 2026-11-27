@@ -100,7 +100,7 @@ void I_Tactile(int on, int off, int total)
    the C library's own mallocs: music conversion, the MIDI player), then screen 0 (820 KB: Doom draws on the 8-bit screen,
    screen 1, so this one is free), with the sound and microphone rings between them marked in use for good
    (wup_zone.c: zone_hole_lo/hi). About 2 MB in all. */
-#define HEAP_KEEP (256 * 1024)
+#define HEAP_KEEP (384 * 1024)
 byte *zone_hole_lo, *zone_hole_hi;
 byte *I_ZoneBase (int *size)
 {
