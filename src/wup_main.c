@@ -44,12 +44,19 @@ static uint8_t *scr;
 static unsigned stride;
 static uint16_t row_of[480];                         /* the source row of each screen row */
 
+static void screen_start(void) {                     /* the 8-bit screen, black, from the very start: loading takes
+                                                         seconds, and libwup shows an app's screen after 0.3 s whatever
+                                                         it holds; the RGB one would have shown Doom's zone (it lives
+                                                         there) as a flash of garbage */
+    scr = wup_screen8(); stride = wup_stride8();
+    for (int i = 0; i < 256; i++) wup_palette(i, 0);
+    memset(scr, 0, stride * 480);
+    wup_present8(0, 480);
+}
 void I_InitGraphics(void) {
     I_VideoBuffer = Z_Malloc(SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);
     memset(I_VideoBuffer, 0, SCREENWIDTH * SCREENHEIGHT);   /* (the first screen wipe melts from it: left as it came,
                                                               it showed a frame of garbage) */
-    scr = wup_screen8(); stride = wup_stride8();
-    memset(scr, 0, stride * 480);
     for (int y = 0; y < 480; y++) row_of[y] = (uint16_t)(y * SCREENHEIGHT / 480);
     I_SetPalette(W_CacheLumpName("PLAYPAL", PU_CACHE));   /* (Doom's own, from the start) */
     wup_present8(0, 480);
@@ -198,6 +205,7 @@ int main(void) {
                                                                     and saves go there too) */
     myargc = 3; myargv = args;
     key_prevweapon = '['; key_nextweapon = ']';
+    screen_start();
     wupdoom_sound_start();
     D_DoomMain();                                    /* (the start, and the first tic) */
     for (;;) doomgeneric_Tick();                     /* (I_Quit ends the app) */
